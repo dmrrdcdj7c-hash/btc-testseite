@@ -3,141 +3,55 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BTC Testseite - Live Preis + Chart</title>
+  <title>Digitaluhr - Aktuelle Uhrzeit</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-    body { font-family: 'Inter', sans-serif; }
-    .price { font-size: 3.5rem; font-weight: 700; }
-    #chart { height: 400px; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .clock-time { font-family: 'Space Grotesk', sans-serif; font-size: 7rem; font-weight: 700; letter-spacing: -4px; }
+    .date { font-size: 1.5rem; }
   </style>
 </head>
-<body class="bg-zinc-950 text-white min-h-screen">
-  <div class="max-w-2xl mx-auto p-6">
-    <!-- Live Preis -->
-    <div class="text-center mb-10">
-      <div class="flex items-center justify-center gap-3 mb-6">
-        <i class="fa-brands fa-bitcoin text-yellow-500 text-6xl"></i>
-        <h1 class="text-5xl font-bold">Bitcoin Live</h1>
-      </div>
-      <div id="price" class="price text-emerald-400 mb-2">Laden...</div>
-      <div id="change" class="text-2xl flex items-center justify-center gap-2"></div>
-      <div class="text-zinc-400 text-sm mt-4">Letzte Aktualisierung: <span id="last-update" class="font-mono"></span></div>
+<body class="bg-zinc-950 text-white min-h-screen flex items-center justify-center">
+  <div class="text-center px-6">
+    <div class="flex items-center justify-center gap-3 mb-8">
+      <i class="fa-solid fa-clock text-5xl text-blue-400"></i>
+      <h1 class="text-4xl font-semibold tracking-tight">Aktuelle Uhrzeit</h1>
     </div>
-
-    <!-- Kerzen-Chart -->
-    <div class="bg-zinc-900 rounded-3xl p-5">
-      <h2 class="text-xl font-semibold mb-4 flex items-center gap-2">
-        <i class="fa-solid fa-chart-candlestick"></i>
-        Heutiger BTC Preisverlauf (24h)
-      </h2>
-      <div id="chart" class="w-full"></div>
+    
+    <div id="time" class="clock-time text-white mb-2">00:00:00</div>
+    
+    <div id="date" class="date text-zinc-400 font-medium"></div>
+    
+    <div class="mt-12 text-zinc-500 text-sm flex items-center justify-center gap-2">
+      <i class="fa-solid fa-globe"></i>
+      <span>Deutschland • CEST</span>
     </div>
-
-    <button onclick="fetchPrice()" class="mt-8 w-full py-4 bg-white text-black rounded-2xl font-medium text-lg">
-      <i class="fa-solid fa-rotate"></i> Preis & Chart aktualisieren
-    </button>
   </div>
 
   <script>
-    let chart = null;
-    let chartData = [];
-
-    async function fetchPrice() {
-      const priceEl = document.getElementById('price');
-      const changeEl = document.getElementById('change');
-      const updateEl = document.getElementById('last-update');
+    function updateClock() {
+      const now = new Date();
       
-      priceEl.textContent = 'Laden...';
+      // Zeit formatieren (24h)
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
       
-      try {
-        const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=eur&include_24hr_change=true');
-        const data = await res.json();
-        
-        const price = data.bitcoin.eur.toLocaleString('de-DE');
-        const change24h = data.bitcoin.eur_24h_change || 0;
-        
-        priceEl.textContent = price + ' €';
-        
-        const isPositive = change24h >= 0;
-        changeEl.innerHTML = `
-          <span class="${isPositive ? 'text-emerald-400' : 'text-red-400'}">
-            ${isPositive ? '↑' : '↓'} ${change24h.toFixed(2)}%
-          </span>
-          <span class="text-zinc-400 text-base ml-3">24h</span>
-        `;
-        
-        const now = new Date();
-        updateEl.textContent = now.toLocaleTimeString('de-DE');
-      } catch (e) {
-        priceEl.textContent = 'Fehler';
-      }
+      document.getElementById('time').textContent = `${hours}:${minutes}:${seconds}`;
+      
+      // Datum formatieren
+      const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      const dateStr = now.toLocaleDateString('de-DE', dateOptions);
+      document.getElementById('date').textContent = dateStr;
     }
 
-    async function fetchOHLC() {
-      try {
-        const res = await fetch('https://api.coingecko.com/api/v3/coins/bitcoin/ohlc?vs_currency=eur&days=1');
-        const data = await res.json();
-        
-        // Convert to Lightweight Charts format
-        chartData = data.map(item => ({
-          time: Math.floor(item[0] / 1000), // timestamp to seconds
-          open: item[1],
-          high: item[2],
-          low: item[3],
-          close: item[4]
-        }));
-        
-        renderChart();
-      } catch (e) {
-        console.error('OHLC Fehler', e);
-      }
-    }
-
-    function renderChart() {
-      const chartContainer = document.getElementById('chart');
-      if (chart) chart.remove();
-      
-      chart = LightweightCharts.createChart(chartContainer, {
-        width: chartContainer.clientWidth,
-        height: 400,
-        layout: { background: { color: '#18181b' }, textColor: '#d1d5db' },
-        grid: { vertLines: { color: '#27272a' }, horzLines: { color: '#27272a' } },
-        crosshair: { mode: LightweightCharts.CrosshairMode.Magnet },
-        rightPriceScale: { borderColor: '#27272a' },
-        timeScale: { borderColor: '#27272a', timeVisible: true, secondsVisible: false }
-      });
-      
-      const candleSeries = chart.addCandlestickSeries({
-        upColor: '#10b981',
-        downColor: '#ef4444',
-        borderVisible: false,
-        wickUpColor: '#10b981',
-        wickDownColor: '#ef4444'
-      });
-      
-      candleSeries.setData(chartData);
-      chart.timeScale().fitContent();
-    }
-
-    // Auto refresh
-    function startAutoRefresh() {
-      fetchPrice();
-      fetchOHLC();
-      setInterval(() => {
-        fetchPrice();
-        fetchOHLC();
-      }, 60000); // alle 60 Sekunden
-    }
-
-    window.onload = startAutoRefresh;
-
-    // Resize handler
-    window.addEventListener('resize', () => {
-      if (chart) chart.resize(document.getElementById('chart').clientWidth, 400);
-    });
+    // Alle 1000ms aktualisieren
+    setInterval(updateClock, 1000);
+    
+    // Sofort beim Laden aktualisieren
+    window.onload = updateClock;
   </script>
 </body>
 </html>
